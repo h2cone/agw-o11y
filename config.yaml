@@ -1,0 +1,22 @@
+config:
+    enableIpv6: false
+frontendPolicies:
+    tracing:
+        host: localhost:4317
+        randomSampling: true
+    accessLog:
+        add:
+            trace.id: trace.id
+            span.id: span.id
+binds:
+    - port: 8009
+      listeners:
+          - protocol: HTTP
+            routes:
+                - matches:
+                      - path:
+                            pathPrefix: /
+                  backends:
+                      - host: api.aicodemirror.com:443
+                        policies:
+                            backendTLS: {}
