@@ -2,7 +2,7 @@ config:
     enableIpv6: false
 frontendPolicies:
     tracing:
-        host: localhost:4317
+        host: localhost:14317
         randomSampling: true
     accessLog:
         add:
