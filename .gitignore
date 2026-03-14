@@ -20,3 +20,6 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.swp
+
+# Docs
+docs/req.md

@@ -1,54 +1,107 @@
 # agw-o11y
 
-Observability setup for AgentGateway using OpenTelemetry, Prometheus, Loki, Tempo, and Grafana.
+Observability workspace for AgentGateway built around Vector and the VictoriaMetrics stack.
+
+## Architecture
+
+- AgentGateway proxy on `127.0.0.1:8009`
+- OTLP ingress: Vector on `127.0.0.1:14317` (gRPC) and `127.0.0.1:14318` (HTTP)
+- Logs backend: VictoriaLogs
+- Metrics backend: VictoriaMetrics
+- Traces backend: VictoriaTraces
+
+The data path is:
+
+```text
+AgentGateway -> Vector -> VictoriaLogs / VictoriaMetrics / VictoriaTraces
+```
+
+Queries go directly to the native Victoria backends.
 
 ## Features
 
-- AgentGateway config with tracing and access-log enrichment
-- OpenTelemetry Collector for receiving OTLP logs and traces
-- Tempo backend for trace storage
-- Loki backend for log storage
-- Prometheus scraping for AgentGateway and collector metrics
-- Docker Compose stack for local observability services
+- Compose-managed AgentGateway wired to Vector and the Victoria backends
+- OTLP ingress through Vector for access logs and traces
+- Prometheus scrape from Vector into VictoriaMetrics for AgentGateway runtime metrics
+- Native Victoria backends for all three signals
+- PromQL-compatible API via VictoriaMetrics
+- Tempo / TraceQL-compatible query API via VictoriaTraces
+- Native LogsQL query API via VictoriaLogs
+- Single AgentGateway config used directly by Docker Compose
 
 ## Getting Started
 
 ### Prerequisites
 
 - Docker and Docker Compose
-- An AgentGateway instance exposing metrics on `host.docker.internal:15020`
-- AgentGateway configured to send tracing data to `localhost:14317`
 
-### Run the observability stack
+### Run the stack
 
 ```bash
-docker compose -f docker-compose.observability.yaml up -d
+docker compose up -d
 ```
 
-The observability services do not set a Docker restart policy, so they stay stopped after Docker Desktop restarts until you start them again explicitly.
+This now starts:
 
-The collector binds host ports `14317` and `14318` by default because `4317` and `4318` are commonly reserved or left in a bad state by Docker Desktop port forwarding. Override them if needed:
+- `agentgateway` on `127.0.0.1:8009`
+- `vector` on `127.0.0.1:14317` and `127.0.0.1:14318`
+- `victoria-logs` on `127.0.0.1:9428`
+- `victoria-metrics` on `127.0.0.1:9090`
+- `victoria-traces` on `127.0.0.1:3200`
+
+## Access
+
+### OTLP ingress
+
+- Vector OTLP gRPC: `127.0.0.1:14317`
+- Vector OTLP HTTP: `127.0.0.1:14318`
+
+### AgentGateway
+
+- Gateway listener: `http://127.0.0.1:8009`
+- Admin UI / admin API: `http://127.0.0.1:15000`
+- Prometheus metrics: `http://127.0.0.1:15020/metrics`
+
+### Native Victoria endpoints
+
+- VictoriaLogs UI and LogsQL API: `http://127.0.0.1:9428`
+  - Query: `GET /select/logsql/query`
+  - Stats: `GET /select/logsql/stats_query`
+  - Range stats: `GET /select/logsql/stats_query_range`
+- VictoriaMetrics UI and PromQL API: `http://127.0.0.1:9090`
+  - Instant query: `GET /api/v1/query`
+  - Range query: `GET /api/v1/query_range`
+- VictoriaTraces UI and Tempo-compatible API: `http://127.0.0.1:3200`
+  - Search: `GET|POST /select/tempo/api/search`
+  - Tags: `GET /select/tempo/api/v2/search/tags`
+  - Trace by id: `GET /select/tempo/api/v2/traces/<trace_id>`
+
+## Query Examples
 
 ```bash
-AGW_OTLP_GRPC_HOST_PORT=4317 AGW_OTLP_HTTP_HOST_PORT=4318 docker compose -f docker-compose.observability.yaml up -d
+# LogsQL: list recent AgentGateway access logs
+curl -G --data-urlencode 'query=*' \
+  http://127.0.0.1:9428/select/logsql/query
+
+# PromQL: verify AgentGateway metrics landed in VictoriaMetrics
+curl -G --data-urlencode 'query=agentgateway_tokio_num_workers' \
+  http://127.0.0.1:9090/api/v1/query
+
+# TraceQL / Tempo search: list recent traces
+curl -G --data-urlencode 'q={}' \
+  http://127.0.0.1:3200/select/tempo/api/search
+
+# TraceQL filter example
+curl -G --data-urlencode 'q={ span.http.method = "GET" }' \
+  http://127.0.0.1:3200/select/tempo/api/search
 ```
 
-### Files
+## Files
 
-- `config.yaml` — sample AgentGateway configuration with tracing and access-log fields
-- `docker-compose.observability.yaml` — local observability stack
-- `observability/otel-collector.yaml` — OTLP receiver and exporters
-- `observability/prometheus.yaml` — Prometheus scrape config
-- `observability/loki.yaml` — Loki config
-- `observability/tempo.yaml` — Tempo config
-
-### Access services
-
-- Grafana: http://127.0.0.1:3001
-- Prometheus: http://127.0.0.1:9090
-- Loki: http://127.0.0.1:3100
-- Tempo: http://127.0.0.1:3200
+- `agentgateway.yaml` - AgentGateway configuration used by Docker Compose
+- `docker-compose.yaml` - local AgentGateway + Vector + Victoria stack
+- `vector.yaml` - Vector OTLP and Prometheus routing config
 
 ## License
 
-MIT License — see [LICENSE](LICENSE)
+MIT License - see [LICENSE](LICENSE)

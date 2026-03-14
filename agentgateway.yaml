@@ -1,0 +1,42 @@
+config:
+  enableIpv6: false
+  adminAddr: 0.0.0.0:15000
+  statsAddr: 0.0.0.0:15020
+  readinessAddr: 0.0.0.0:15021
+  logging:
+    format: json
+  tracing:
+    otlpEndpoint: http://vector:4317
+    otlpProtocol: grpc
+    randomSampling: true
+    fields:
+      add:
+        span.name: '"openai.chat"'
+        gen_ai.system: 'llm.provider'
+        gen_ai.prompt: 'flattenRecursive(llm.prompt)'
+        gen_ai.completion: 'flattenRecursive(llm.completion.map(c, {"role":"assistant", "content": c}))'
+        gen_ai.usage.prompt_tokens: 'llm.inputTokens'
+        gen_ai.usage.completion_tokens: 'llm.outputTokens'
+        gen_ai.request.model: 'llm.requestModel'
+        gen_ai.response.model: 'llm.responseModel'
+        llm.is_streaming: 'llm.streaming'
+        llm.usage.total_tokens: 'llm.totalTokens'
+  metrics:
+    remove:
+      - build
+frontendPolicies:
+  accessLog:
+    otlp:
+      host: vector:4317
+binds:
+  - port: 8009
+    listeners:
+      - protocol: HTTP
+        routes:
+          - matches:
+              - path:
+                  pathPrefix: /
+            backends:
+              - host: api.aicodemirror.com:443
+                policies:
+                  backendTLS: {}

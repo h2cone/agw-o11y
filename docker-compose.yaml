@@ -1,0 +1,58 @@
+name: agentgateway-observability
+
+services:
+  agentgateway:
+    image: ${AGW_IMAGE:-cr.agentgateway.dev/agentgateway:v1.0.0-rc.2}
+    container_name: agw-agentgateway
+    command: ["-f", "/etc/agentgateway/agentgateway.yaml"]
+    volumes:
+      - ./agentgateway.yaml:/etc/agentgateway/agentgateway.yaml:ro
+    ports:
+      - "127.0.0.1:${AGW_GATEWAY_HOST_PORT:-8009}:8009"
+      - "127.0.0.1:${AGW_ADMIN_HOST_PORT:-15000}:15000"
+      - "127.0.0.1:${AGW_STATS_HOST_PORT:-15020}:15020"
+    depends_on:
+      - vector
+
+  vector:
+    image: timberio/vector:0.54.0-debian
+    container_name: agw-vector
+    command: ["--config", "/etc/vector/vector.yaml"]
+    volumes:
+      - ./vector.yaml:/etc/vector/vector.yaml:ro
+    ports:
+      - "127.0.0.1:${AGW_OTLP_GRPC_HOST_PORT:-14317}:4317"
+      - "127.0.0.1:${AGW_OTLP_HTTP_HOST_PORT:-14318}:4318"
+    depends_on:
+      - victoria-logs
+      - victoria-metrics
+      - victoria-traces
+
+  victoria-logs:
+    image: victoriametrics/victoria-logs:latest
+    container_name: agw-victoria-logs
+    volumes:
+      - victoria-logs-data:/victoria-logs-data
+    ports:
+      - "127.0.0.1:${AGW_VICTORIA_LOGS_HOST_PORT:-9428}:9428"
+
+  victoria-metrics:
+    image: victoriametrics/victoria-metrics:latest
+    container_name: agw-victoria-metrics
+    volumes:
+      - victoria-metrics-data:/victoria-metrics-data
+    ports:
+      - "127.0.0.1:${AGW_PROMQL_HOST_PORT:-9090}:8428"
+
+  victoria-traces:
+    image: victoriametrics/victoria-traces:latest
+    container_name: agw-victoria-traces
+    volumes:
+      - victoria-traces-data:/victoria-traces-data
+    ports:
+      - "127.0.0.1:${AGW_VICTORIA_TRACES_HOST_PORT:-3200}:10428"
+
+volumes:
+  victoria-logs-data:
+  victoria-metrics-data:
+  victoria-traces-data:
