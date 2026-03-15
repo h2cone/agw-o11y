@@ -52,6 +52,16 @@ services:
     ports:
       - "127.0.0.1:${AGW_VICTORIA_TRACES_HOST_PORT:-3200}:10428"
 
+  web:
+    build: ./web
+    container_name: agw-web
+    ports:
+      - "127.0.0.1:${AGW_WEB_HOST_PORT:-3000}:3000"
+    environment:
+      - VICTORIA_LOGS_URL=http://victoria-logs:9428
+    depends_on:
+      - victoria-logs
+
 volumes:
   victoria-logs-data:
   victoria-metrics-data:

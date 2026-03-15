@@ -26,6 +26,16 @@ config:
       - build
 frontendPolicies:
   accessLog:
+    add:
+      llm.provider: 'request.path.contains("/claudecode/") ? "anthropic" : request.path.contains("/codex/") ? "openai" : null'
+      llm.request.model: 'json(request.body).with(b, default(default(b.model, b.modelId), b.model_id))'
+      llm.response.model: 'json(response.body).with(b, default(default(b.model, b.modelId), b.model_id))'
+      llm.request.body: 'string(request.body)'
+      llm.response.body: 'string(response.body)'
+      llm.usage.prompt_tokens: 'json(response.body).with(b, default(default(default(b.usage.input_tokens, b.usage.prompt_tokens), b.usage.inputTokens), b.usage.promptTokens))'
+      llm.usage.completion_tokens: 'json(response.body).with(b, default(default(default(b.usage.output_tokens, b.usage.completion_tokens), b.usage.outputTokens), b.usage.completionTokens))'
+      llm.usage.total_tokens: 'json(response.body).with(b, default(default(b.usage.total_tokens, b.usage.totalTokens), default(default(default(b.usage.input_tokens, b.usage.prompt_tokens), b.usage.inputTokens), b.usage.promptTokens) + default(default(default(b.usage.output_tokens, b.usage.completion_tokens), b.usage.outputTokens), b.usage.completionTokens) + default(default(b.usage.cache_creation_input_tokens, b.usage.cacheCreationInputTokens), 0) + default(default(b.usage.cache_read_input_tokens, b.usage.cacheReadInputTokens), 0)))'
+      llm.is_streaming: 'default(json(request.body).stream, false)'
     otlp:
       host: vector:4317
 binds:
