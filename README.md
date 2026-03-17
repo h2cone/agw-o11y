@@ -85,7 +85,7 @@ This now starts:
 - `agentgateway.yaml` - AgentGateway configuration used by Docker Compose
 - `docker-compose.yaml` - local AgentGateway + Vector + Victoria stack, including the web UI
 - `vector.yaml` - Vector OTLP and Prometheus routing config
-- `web/` - React frontend, Go proxy server, and container build for the access logs UI
+- `web/` - React + Vite+ frontend, Go proxy server, and container build for the access logs UI
 
 ## Web Development
 
@@ -97,7 +97,7 @@ npm install
 npm run dev
 ```
 
-Vite runs on `http://127.0.0.1:5173` by default.
+Vite+ runs the dev server on `http://127.0.0.1:5173` by default.
 Use this for frontend iteration only. For end-to-end log queries, run the bundled `web` service with Docker so `/api/logs/query` is available on the same origin.
 
 ### Production build
