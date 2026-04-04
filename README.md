@@ -4,7 +4,7 @@ Observability workspace for AgentGateway built around Vector and the VictoriaMet
 
 ## Architecture
 
-- AgentGateway proxy on `127.0.0.1:8009`
+- AgentGateway proxy on `127.0.0.1:18009`
 - OTLP ingress: Vector on `127.0.0.1:14317` (gRPC) and `127.0.0.1:14318` (HTTP)
 - Logs backend: VictoriaLogs
 - Metrics backend: VictoriaMetrics
@@ -48,7 +48,7 @@ docker compose up -d
 
 This now starts:
 
-- `agentgateway` on `127.0.0.1:8009`
+- `agentgateway` on `127.0.0.1:18009`
 - `vector` on `127.0.0.1:14317` and `127.0.0.1:14318`
 - `victoria-logs` on `127.0.0.1:9428`
 - `victoria-metrics` on `127.0.0.1:9090`
@@ -64,9 +64,13 @@ This now starts:
 
 ### AgentGateway
 
-- Gateway listener: `http://127.0.0.1:8009`
+- Gateway listener: `http://127.0.0.1:18009`
 - Admin UI / admin API: `http://127.0.0.1:15000`
 - Prometheus metrics: `http://127.0.0.1:15020/metrics`
+
+The AgentGateway container still listens on port `8009` internally. If your host
+environment allows that port to be published directly, you can restore the old
+mapping with `AGW_GATEWAY_HOST_PORT=8009 docker compose up -d`.
 
 ### Web UI
 

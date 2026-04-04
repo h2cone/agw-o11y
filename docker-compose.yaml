@@ -8,7 +8,9 @@ services:
     volumes:
       - ./agentgateway.yaml:/etc/agentgateway/agentgateway.yaml:ro
     ports:
-      - "127.0.0.1:${AGW_GATEWAY_HOST_PORT:-8009}:8009"
+      # Keep the container listener on 8009, but default to a higher host port
+      # because some remote Docker environments reject forwarding 800x ports.
+      - "127.0.0.1:${AGW_GATEWAY_HOST_PORT:-18009}:8009"
       - "127.0.0.1:${AGW_ADMIN_HOST_PORT:-15000}:15000"
       - "127.0.0.1:${AGW_STATS_HOST_PORT:-15020}:15020"
     depends_on:

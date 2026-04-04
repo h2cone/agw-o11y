@@ -61,6 +61,50 @@ describe("logs/presentation", () => {
     expect(summary.providerBadgeClass).toContain("slate");
   });
 
+  it("derives response metadata from SSE response bodies", () => {
+    const responseBody = [
+      "event: response.created",
+      'data: {"type":"response.created","response":{"model":"gpt-5.4"}}',
+      "",
+      "event: response.completed",
+      'data: {"type":"response.completed","response":{"model":"gpt-5.4","usage":{"input_tokens":56119,"output_tokens":170,"total_tokens":56289}}}',
+    ].join("\n");
+
+    const entry = {
+      _time: "2026-03-15T10:20:30Z",
+      _msg: "Request completed",
+      "llm.provider": "openai",
+      "llm.request.model": "gpt-5.4",
+      "llm.response.body": responseBody,
+    };
+
+    const summary = buildLogSummary(entry);
+    const details = getPrimaryLogDetails(entry);
+
+    expect(summary).toMatchObject({
+      model: "gpt-5.4",
+      promptTokens: "56119",
+      completionTokens: "170",
+      totalTokens: "56289",
+    });
+    expect(details[4]).toEqual({
+      label: "Response model",
+      value: "gpt-5.4",
+    });
+    expect(details[6]).toEqual({
+      label: "Prompt tokens",
+      value: "56119",
+    });
+    expect(details[7]).toEqual({
+      label: "Completion tokens",
+      value: "170",
+    });
+    expect(details[8]).toEqual({
+      label: "Total tokens",
+      value: "56289",
+    });
+  });
+
   it("uses the anthropic badge when appropriate", () => {
     const summary = buildLogSummary({
       "llm.provider": "anthropic",

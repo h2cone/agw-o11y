@@ -44,27 +44,29 @@ export interface DetailField {
 }
 
 export function buildLogSummary(entry: LogEntry): LogSummary {
+  const metadata = getDerivedLlmMetadata(entry);
   const provider = stringifyValue(entry["llm.provider"]) || "unknown";
-  const requestModel = stringifyValue(entry["llm.request.model"]);
-  const responseModel = stringifyValue(entry["llm.response.model"]);
+  const requestModel = metadata.requestModel;
+  const responseModel = metadata.responseModel;
 
   return {
     provider,
     providerBadgeClass: providerBadgeClass(provider),
     model: requestModel || responseModel || "unknown-model",
     streaming: truthy(entry["llm.is_streaming"]),
-    promptTokens: stringifyValue(entry["llm.usage.prompt_tokens"]),
-    completionTokens: stringifyValue(entry["llm.usage.completion_tokens"]),
-    totalTokens: stringifyValue(entry["llm.usage.total_tokens"]),
+    promptTokens: metadata.promptTokens,
+    completionTokens: metadata.completionTokens,
+    totalTokens: metadata.totalTokens,
     message: stringifyValue(entry._msg) || "Structured access log event",
     timestamp: formatTimestamp(entry._time),
   };
 }
 
 export function getPrimaryLogDetails(entry: LogEntry): DetailField[] {
+  const metadata = getDerivedLlmMetadata(entry);
   return PRIMARY_DETAIL_FIELDS.map(({ label, key }) => ({
     label,
-    value: entry[key],
+    value: getPrimaryFieldValue(entry, key, metadata),
   }));
 }
 
@@ -131,6 +133,112 @@ function stringifyValue(value: unknown): string {
   } catch {
     return "";
   }
+}
+
+interface DerivedLlmMetadata {
+  requestModel: string;
+  responseModel: string;
+  promptTokens: string;
+  completionTokens: string;
+  totalTokens: string;
+}
+
+function getDerivedLlmMetadata(entry: LogEntry): DerivedLlmMetadata {
+  const fallback = parseResponseBodyMetadata(entry["llm.response.body"]);
+
+  return {
+    requestModel: stringifyValue(entry["llm.request.model"]),
+    responseModel:
+      stringifyValue(entry["llm.response.model"]) ||
+      stringifyValue(fallback.model),
+    promptTokens:
+      stringifyValue(entry["llm.usage.prompt_tokens"]) ||
+      stringifyValue(fallback.promptTokens),
+    completionTokens:
+      stringifyValue(entry["llm.usage.completion_tokens"]) ||
+      stringifyValue(fallback.completionTokens),
+    totalTokens:
+      stringifyValue(entry["llm.usage.total_tokens"]) ||
+      stringifyValue(fallback.totalTokens),
+  };
+}
+
+function getPrimaryFieldValue(
+  entry: LogEntry,
+  key: string,
+  metadata: DerivedLlmMetadata,
+): unknown {
+  switch (key) {
+    case "llm.response.model":
+      return metadata.responseModel || entry[key];
+    case "llm.usage.prompt_tokens":
+      return metadata.promptTokens || entry[key];
+    case "llm.usage.completion_tokens":
+      return metadata.completionTokens || entry[key];
+    case "llm.usage.total_tokens":
+      return metadata.totalTokens || entry[key];
+    default:
+      return entry[key];
+  }
+}
+
+function parseResponseBodyMetadata(value: unknown): {
+  model?: unknown;
+  promptTokens?: unknown;
+  completionTokens?: unknown;
+  totalTokens?: unknown;
+} {
+  if (typeof value !== "string" || !value.includes("event: response.completed")) {
+    return {};
+  }
+
+  let completedEvent: Record<string, unknown> | undefined;
+  for (const chunk of value.split("\n\n")) {
+    const lines = chunk.split("\n");
+    const event = lines.find((line) => line.startsWith("event: "))?.slice(7).trim();
+    if (event !== "response.completed") {
+      continue;
+    }
+
+    const data = lines
+      .filter((line) => line.startsWith("data: "))
+      .map((line) => line.slice(6))
+      .join("\n");
+    if (!data) {
+      continue;
+    }
+
+    try {
+      completedEvent = JSON.parse(data) as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+  }
+
+  const response = asRecord(completedEvent?.response);
+  const usage = asRecord(response?.usage);
+
+  return {
+    model: response?.model ?? response?.model_id ?? response?.modelId,
+    promptTokens:
+      usage?.input_tokens ??
+      usage?.prompt_tokens ??
+      usage?.inputTokens ??
+      usage?.promptTokens,
+    completionTokens:
+      usage?.output_tokens ??
+      usage?.completion_tokens ??
+      usage?.outputTokens ??
+      usage?.completionTokens,
+    totalTokens: usage?.total_tokens ?? usage?.totalTokens,
+  };
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  return value as Record<string, unknown>;
 }
 
 function truthy(value: unknown): boolean {
